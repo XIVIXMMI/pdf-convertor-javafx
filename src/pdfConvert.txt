@@ -1,0 +1,80 @@
+2024-12-31 23:10:07.002 java[87770:13764483] *** Assertion failure in -[_NSTrackingAreaAKViewHelper removeTrackingRect:], _NSTrackingAreaAKManager.m:1781
+*** Terminating app due to uncaught exception 'NSInternalInconsistencyException', reason: '0x0 is an invalid NSTrackingRectTag. Common possible reasons for this are: 1. already removed this trackingRectTag, 2. Truncated the NSTrackingRectTag to 32bit at some point.'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x000000018940c540 __exceptionPreprocess + 176
+	1   libobjc.A.dylib                     0x0000000188efdeb4 objc_exception_throw + 60
+	2   Foundation                          0x000000018a55639c -[NSCalendarDate initWithCoder:] + 0
+	3   AppKit                              0x000000018d266f6c -[_NSTrackingAreaAKViewHelper removeTrackingRect:] + 200
+	4   libglass.dylib                      0x000000010d282f7c Java_com_sun_glass_ui_mac_MacApplication__1getMacKey + 3456
+	5   libglass.dylib                      0x000000010d288074 RemoteLayerHostRemoteIdInLocal + 3620
+	6   AppKit                              0x000000018cbad3ec -[NSView setFrame:] + 304
+	7   libglass.dylib                      0x000000010d2880d4 RemoteLayerHostRemoteIdInLocal + 3716
+	8   AppKit                              0x000000018cbba5f0 -[NSView resizeWithOldSuperviewSize:] + 488
+	9   AppKit                              0x000000018cbb9ff4 -[NSView resizeSubviewsWithOldSize:] + 360
+	10  AppKit                              0x000000018cb9f584 -[NSView setFrameSize:] + 1136
+	11  AppKit                              0x000000018cbad3ec -[NSView setFrame:] + 304
+	12  AppKit                              0x000000018cbba5f0 -[NSView resizeWithOldSuperviewSize:] + 488
+	13  AppKit                              0x000000018cbb9ff4 -[NSView resizeSubviewsWithOldSize:] + 360
+	14  AppKit                              0x000000018cb9f584 -[NSView setFrameSize:] + 1136
+	15  AppKit                              0x000000018cbb91d8 -[NSThemeFrame setFrameSize:] + 244
+	16  AppKit                              0x000000018cbb8b3c -[NSWindow _oldPlaceWindow:fromServer:] + 532
+	17  AppKit                              0x000000018cbb7ff8 -[NSWindow _setFrameCommon:display:fromServer:] + 1832
+	18  libglass.dylib                      0x000000010d2930c4 Java_com_sun_glass_ui_mac_MacWindow__1setBounds2 + 416
+	19  ???                                 0x000000012ffad8ac 0x0 + 5099935916
+	20  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	21  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	22  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	23  ???                                 0x000000012ffaa508 0x0 + 5099922696
+	24  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	25  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	26  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	27  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	28  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	29  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	30  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	31  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	32  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	33  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	34  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	35  ???                                 0x000000012ffaa508 0x0 + 5099922696
+	36  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	37  ???                                 0x000000012ffaa508 0x0 + 5099922696
+	38  ???                                 0x000000012ffa9d80 0x0 + 5099920768
+	39  ???                                 0x000000012ffaa2c0 0x0 + 5099922112
+	40  ???                                 0x000000012ffa9d80 0x0 + 5099920768
+	41  ???                                 0x000000012ffa9d80 0x0 + 5099920768
+	42  ???                                 0x000000012ffa9fc8 0x0 + 5099921352
+	43  ???                                 0x000000012ffaa508 0x0 + 5099922696
+	44  ???                                 0x000000012ffa4140 0x0 + 5099897152
+	45  libjvm.dylib                        0x00000001065eb108 _ZN9JavaCalls11call_helperEP9JavaValueRK12methodHandleP17JavaCallArgumentsP10JavaThread + 908
+	46  libjvm.dylib                        0x000000010664993c _ZL20jni_invoke_nonstaticP7JNIEnv_P9JavaValueP8_jobject11JNICallTypeP10_jmethodIDP18JNI_ArgumentPusherP10JavaThread + 916
+	47  libjvm.dylib                        0x000000010664e07c jni_CallVoidMethod + 312
+	48  libglass.dylib                      0x000000010d27e998 JNI_OnLoad + 204
+	49  Foundation                          0x000000018a4bf1f8 __NSThreadPerformPerform + 264
+	50  CoreFoundation                      0x00000001893979dc __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ + 28
+	51  CoreFoundation                      0x0000000189397970 __CFRunLoopDoSource0 + 176
+	52  CoreFoundation                      0x00000001893976e0 __CFRunLoopDoSources0 + 244
+	53  CoreFoundation                      0x00000001893962d0 __CFRunLoopRun + 828
+	54  CoreFoundation                      0x000000018939593c CFRunLoopRunSpecific + 608
+	55  HIToolbox                           0x000000019395e448 RunCurrentEventLoopInMode + 292
+	56  HIToolbox                           0x000000019395e284 ReceiveNextEventCommon + 648
+	57  HIToolbox                           0x000000019395dfdc _BlockUntilNextEventMatchingListInModeWithFilter + 76
+	58  AppKit                              0x000000018cb74ed0 _DPSNextEvent + 660
+	59  AppKit                              0x000000018d35feec -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:] + 716
+	60  AppKit                              0x000000018cb6837c -[NSApplication run] + 476
+	61  libglass.dylib                      0x000000010d280b20 JNI_OnLoad + 8788
+	62  Foundation                          0x000000018a4bf1f8 __NSThreadPerformPerform + 264
+	63  CoreFoundation                      0x00000001893979dc __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__ + 28
+	64  CoreFoundation                      0x0000000189397970 __CFRunLoopDoSource0 + 176
+	65  CoreFoundation                      0x00000001893976e0 __CFRunLoopDoSources0 + 244
+	66  CoreFoundation                      0x00000001893962d0 __CFRunLoopRun + 828
+	67  CoreFoundation                      0x000000018939593c CFRunLoopRunSpecific + 608
+	68  libjli.dylib                        0x000000010508d100 CreateExecutionEnvironment + 404
+	69  libjli.dylib                        0x000000010508926c JLI_Launch + 1208
+	70  java                                0x0000000104bfbba8 main + 408
+	71  dyld                                0x0000000188f390e0 start + 2360
+)
+libc++abi: terminating due to uncaught exception of type NSException
+
+Process finished with exit code 134 (interrupted by signal 6:SIGABRT)

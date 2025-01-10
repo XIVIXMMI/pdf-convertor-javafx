@@ -1,0 +1,135 @@
+
+/* Global Styles */
+.root {
+    -fx-font-family: 'Segoe UI', Arial, sans-serif;
+    -fx-background-color: #f8f9fa;
+}
+
+/* Header Styles */
+.header-container {
+    -fx-padding: 20 0 30 0;
+}
+
+.header-text {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+}
+
+/* Section Styles */
+.section-container {
+    -fx-padding: 10;
+    -fx-background-color: white;
+    -fx-background-radius: 5;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);
+}
+
+.section-header {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #495057;
+}
+
+/* Button Styles */
+.button {
+    -fx-padding: 8 16;
+    -fx-font-size: 13px;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.primary-button {
+    -fx-background-color: #0078d7;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.primary-button:hover {
+    -fx-background-color: #006cbd;
+}
+
+.success-button {
+    -fx-background-color: #28a745;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.success-button:hover {
+    -fx-background-color: #218838;
+}
+
+.danger-button {
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+}
+
+.danger-button:hover {
+    -fx-background-color: #c82333;
+}
+
+.secondary-button {
+    -fx-background-color: #6c757d;
+    -fx-text-fill: white;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #5a6268;
+}
+
+/* Drop Area Styles */
+.drop-area {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 2;
+    -fx-border-style: dashed;
+    -fx-border-radius: 5;
+}
+
+.drop-area:dragover {
+    -fx-border-color: #28a745;
+    -fx-background-color: #e8f5e9;
+}
+
+.drop-text {
+    -fx-font-size: 16px;
+    -fx-text-fill: #495057;
+}
+
+.drop-subtext {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6c757d;
+}
+
+/* Progress Bar Styles */
+.progress-bar {
+    -fx-pref-height: 8px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #28a745;
+}
+
+.progress-bar .track {
+    -fx-background-color: #e9ecef;
+}
+
+.progress-text {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6c757d;
+}
+
+/* Status Area Styles */
+.status-area {
+    -fx-font-family: 'Consolas', 'Monaco', monospace;
+    -fx-font-size: 13px;
+    -fx-background-color: #f8f9fa;
+    -fx-control-inner-background: #f8f9fa;
+    -fx-border-color: #dee2e6;
+}
+
+/* Text Field Styles */
+.path-field {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #dee2e6;
+    -fx-border-radius: 4;
+}

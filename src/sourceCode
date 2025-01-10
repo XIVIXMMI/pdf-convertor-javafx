@@ -1,0 +1,1030 @@
+src/
+├── controller/
+│   ├── PDFConvertController.java
+├── exception/
+│   ├── PDFProcessingException.java
+├── data/
+│   ├── PDFData.java
+├── service/
+│   ├── ConversionService.java
+│   ├── TimerService.java
+│   ├── PDFService.java
+│   ├── ExcelService.java
+├── util/
+│   ├── FileUtils.java
+│   ├── RegexExtractor.java
+
+// Controller
+
+
+package com.lazydev.pdf_convert.controller;
+
+import com.lazydev.pdf_convert.service.ExcelService;
+import com.lazydev.pdf_convert.service.PDFService;
+import com.lazydev.pdf_convert.service.ConversionService;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.*;
+import javafx.concurrent.Task;
+import javafx.fxml.FXML;
+import javafx.scene.control.*;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
+import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
+import javafx.util.Duration;
+
+import java.io.File;
+import java.util.List;
+import java.io.IOException;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class PDFConvertController {
+
+    @FXML private TextField pdfPathField;
+    @FXML private VBox dropArea;
+    @FXML private TextArea statusTextArea;
+    @FXML private ProgressBar progressBar;
+    @FXML private Button cancelButton;
+    @FXML private Button convertButton;
+    @FXML private Label progressLabel;
+    @FXML private Label timerLabel;
+
+    private File[] selectedFolders;
+    private volatile boolean isCancelled;
+    private final ExecutorService executorService;
+    private final PDFService pdfService;
+    private final StringProperty progressMessage = new SimpleStringProperty();
+    private final SimpleBooleanProperty converting = new SimpleBooleanProperty(false);
+    private Task<Void> currentTask;
+    private final ExcelService excelService;
+
+    private final SimpleDoubleProperty progress = new SimpleDoubleProperty(0);
+    private long startTime;
+    private Timeline timer;
+    private final SimpleLongProperty elapsedTimeInSeconds = new SimpleLongProperty(0);
+
+    public PDFConvertController() {
+        this.executorService = Executors.newFixedThreadPool(
+                Runtime.getRuntime().availableProcessors(),
+                new ThreadFactory() {
+                    private final AtomicInteger counter = new AtomicInteger();
+                @Override
+                public Thread newThread(Runnable r) {
+                        Thread thread = new Thread(r);
+                        thread.setName("PDFConverter-" + counter.incrementAndGet());
+                        thread.setDaemon(true);
+                    return thread;
+            }
+        });
+        this.pdfService = new PDFService();
+        this.excelService = new ExcelService();
+    }
+
+    private enum ConversionType {
+        PDF_TO_TXT,
+        TXT_TO_EXCEL,
+        BOTH
+    }
+
+
+    // Controller
+    @FXML
+    public void initialize() {
+        setupDragAndDrop();
+        setupButtons();
+        progressBar.setProgress(0);
+
+        convertButton.disableProperty().bind(converting);
+        cancelButton.disableProperty().bind(converting.not());
+    }
+
+    private void setupButtons() {
+        convertButton.setOnAction(event -> convertData());
+        cancelButton.setOnAction(event -> cancelOperation());
+    }
+
+    private void setupProgressAndTimer() {
+        // Bind progress bar với property
+        progressBar.progressProperty().bind(progress);
+
+        // Khởi tạo timer
+        timer = new Timeline(
+                new KeyFrame(Duration.seconds(1), event -> {
+                    if (startTime > 0) {
+                        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+                        elapsedTimeInSeconds.set(elapsed);
+                        updateTimerLabel(elapsed);
+                    }
+                })
+        );
+        timer.setCycleCount(Timeline.INDEFINITE);
+
+        // Reset timer label
+        timerLabel.setText("Thời gian xử lý: 00:00:00");
+    }
+
+    private void updateTimerLabel(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+        Platform.runLater(() ->
+                timerLabel.setText(String.format("Thời gian xử lý: %02d:%02d:%02d",
+                        hours, minutes, secs)));
+    }
+
+    @FXML
+    private void convertData() {
+        if (selectedFolders == null || selectedFolders.length == 0) {
+            showError("Hãy chọn thư mục trước!");
+            return;
+        }
+
+        startConversion(ConversionType.BOTH);
+    }
+
+    private void startConversion(ConversionType type) {
+        isCancelled = false;
+        currentTask = createConversionTask(type);
+        configureTaskBindings(currentTask);
+
+        converting.set(true);
+
+        new Thread(currentTask).start();
+    }
+
+    private Task<Void> createConversionTask(ConversionType type) {
+        return new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    startTime = System.currentTimeMillis();
+                    Platform.runLater(() ->{
+                        startTime = System.currentTimeMillis();
+                        progress.set(0);
+                        timer.play();
+                    });
+
+                    AtomicInteger completedTasks = new AtomicInteger();
+                    int totalTasks = selectedFolders.length;
+                    CountDownLatch latch = new CountDownLatch(totalTasks);
+
+                    for (File folder : selectedFolders) {
+                        if (isCancelled) {
+                            updateMessage("Tác vụ đã bị hủy.");
+                            break;
+                        }
+
+                        processFolderWithType(folder, completedTasks, totalTasks, type, latch);
+                    }
+                    latch.await();
+                    return null;
+                }catch ( InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                } finally {
+                    Platform.runLater(() -> {
+                        converting.set(false);
+                        timer.stop();
+                        // Lưu tổng thời gian xử lý
+                        long totalTime = (System.currentTimeMillis() - startTime) / 1000;
+                        setStatus(String.format("Hoàn thành! Tổng thời gian xử lý: %02d:%02d:%02d",
+                                totalTime / 3600, (totalTime % 3600) / 60, totalTime % 60), "green");
+                    });
+                }
+            }
+        };
+    }
+
+    private void setupTimer() {
+        timer = new Timeline(
+                new KeyFrame(Duration.seconds(1), event -> {
+                    elapsedTimeInSeconds.set((System.currentTimeMillis() - startTime) / 1000);
+                    updateTimerLabel(elapsedTimeInSeconds.get());
+                })
+        );
+        timer.setCycleCount(Timeline.INDEFINITE);
+
+        // Bind timer label to time property
+        timerLabel.textProperty().bind(
+                Bindings.createStringBinding(() ->
+                                String.format("Thời gian xử lý: %02d:%02d:%02d",
+                                        elapsedTimeInSeconds.get() / 3600,
+                                        (elapsedTimeInSeconds.get() % 3600) / 60,
+                                        elapsedTimeInSeconds.get() % 60),
+                        elapsedTimeInSeconds
+                )
+        );
+    }
+
+//    private void updateTimerLabel(long seconds) {
+//        Platform.runLater(() -> {
+//            long hours = seconds / 3600;
+//            long minutes = (seconds % 3600) / 60;
+//            long secs = seconds % 60;
+//            timerLabel.setText(String.format("Thời gian xử lý: %02d:%02d:%02d", hours, minutes, secs));
+//        });
+//    }
+
+    private void processFolderWithType(File folder, AtomicInteger completedTasks,
+                                        int totalTasks, ConversionType type, CountDownLatch latch) {
+        if (!folder.isDirectory()) {
+            updateTaskMessage("Thư mục không hợp lệ: " + folder.getName());
+            latch.countDown();
+            return;
+        }
+
+        Task<Void> folderTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                try {
+                    double folderProgess = 0.0;
+                    // First convert PDF to TXT if needed
+                    if (type == ConversionType.PDF_TO_TXT || type == ConversionType.BOTH) {
+                        String pdfResult = pdfService.convertAllPDFs(folder);
+                        updateTaskStatus(pdfResult, folder.getName());
+                        folderProgess = 0.5;
+                        updateFolderProgress(completedTasks.get(), totalTasks, folderProgess);
+                        //updateProgress(0.6, 1.0);
+                    }
+
+                    // Then convert TXT to Excel if needed
+                    if (type == ConversionType.TXT_TO_EXCEL || type == ConversionType.BOTH) {
+                        File txtFile = new File(folder, folder.getName() + ".txt");
+                        if (txtFile.exists()) {
+                            excelService.convertTxtToExcel(txtFile);
+                            updateTaskStatus("Chuyển đổi Excel thành công: " + folder.getName(),
+                                    folder.getName());
+                            updateProgress(1.0, 1.0);
+                        }
+                    }
+                } catch (Exception e) {
+                    updateTaskStatus("Lỗi xử lý: " + e.getMessage(), folder.getName());
+                } finally {
+                    int completed = completedTasks.incrementAndGet();
+                    updateProgressLabel(completed, totalTasks);
+                    updateFolderProgress(completed, totalTasks, 1.0);
+                    latch.countDown();
+                }
+                return null;
+            }
+        };
+
+        //bindTaskToUI(folderTask, completedTasks, totalTasks);
+        executorService.submit(folderTask);
+    }
+
+    private void updateFolderProgress(int completedFolders, int totalFolders, double folderProgress) {
+        // Tính toán tổng progress dựa trên số folder đã hoàn thành và progress của folder hiện tại
+        double totalProgress = (completedFolders + folderProgress) / totalFolders;
+        Platform.runLater(() -> progress.set(totalProgress));
+    }
+
+    private void updateTaskStatus(String message, String fileName) {
+        Platform.runLater(() -> {
+            setStatus(fileName + ": " + message, "black");
+            progressMessage.set(message);
+        });
+    }
+
+    // Liên kết Task với giao diện
+    private void bindTaskToUI(Task<?> task, AtomicInteger completedTasks, int totalTasks) {
+        progressBar.progressProperty().bind(task.progressProperty());
+        task.messageProperty().addListener((obs, oldMessage, newMessage) ->
+                Platform.runLater(() -> progressLabel.setText(newMessage)));
+
+        task.progressProperty().addListener((obs, oldProgress, newProgress) -> {
+            Platform.runLater(() -> updateProgressLabel(completedTasks.get(), totalTasks));
+        });
+    }
+
+    // Method to update the progress label text
+    public void updateProgressLabel(int processed, int total) {
+        progressMessage.set(processed + "/" + total + " thư mục đã xử lý");
+    }
+
+    private void updateTaskMessage(String message) {
+        Platform.runLater(() -> progressMessage.set(message));
+    }
+
+    private void configureTaskBindings(Task<Void> task) {
+        // The binding remains the same
+        progressBar.progressProperty().bind(task.progressProperty());
+        // Add a listener to update the progress label
+        task.progressProperty().addListener((obs, oldVal, newVal) -> {
+            Platform.runLater(() -> {
+                double progress = newVal.doubleValue();
+                int percentage = (int) (progress * 100);
+                progressLabel.setText(percentage + "% completed");
+            });
+        });
+
+        task.messageProperty().addListener((obs, oldMessage, newMessage) ->
+                setStatus(newMessage, "black"));
+    }
+
+    private void setupDragAndDrop() {
+        dropArea.setOnDragOver(this::handleDragOver);
+        dropArea.setOnDragDropped(this::handleDragDropped);
+
+        // Add visual feedback
+        dropArea.setOnDragEntered(e -> dropArea.setStyle("-fx-border-color: green;"));
+        dropArea.setOnDragExited(e -> dropArea.setStyle(""));
+    }
+
+    private void handleDragOver(DragEvent event) {
+        if (event.getDragboard().hasFiles()) {
+            event.acceptTransferModes(TransferMode.COPY);
+        }
+        event.consume();
+    }
+
+    private void handleDragDropped(DragEvent event) {
+        Dragboard db = event.getDragboard();
+        boolean success = false;
+
+        if (db.hasFiles()) {
+            selectedFolders = db.getFiles().stream()
+                    .filter(File::isDirectory)
+                    .toArray(File[]::new);
+
+            if (selectedFolders.length > 0) {
+                pdfPathField.setText(String.join(", ",
+                        db.getFiles().stream()
+                                .map(File::getAbsolutePath)
+                                .toArray(String[]::new)));
+                success = true;
+                setStatus("Đã chọn " + selectedFolders.length + " thư mục", "black");
+            } else {
+                setStatus("Vui lòng chọn thư mục hợp lệ", "red");
+            }
+        }
+
+        event.setDropCompleted(success);
+        event.consume();
+    }
+
+
+    private void cancelOperation() {
+        isCancelled = true;
+        if (currentTask != null) {
+            currentTask.cancel(true);
+        }
+        executorService.shutdownNow();
+
+        Platform.runLater(() -> {
+            progress.set(0);
+            progressLabel.setText("Đã hủy tác vụ");
+            timer.stop();
+            elapsedTimeInSeconds.set(0);
+            timerLabel.setText("Thời gian xử lý: 00:00:00");
+            convertButton.setDisable(false);
+            cancelButton.setDisable(true);
+            setStatus("Đã hủy quá trình chuyển đổi.", "red");
+        });
+    }
+
+    @FXML
+    private void openDirectoryChooser() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Chọn thư mục chứa PDF");
+        File selectedDirectory = directoryChooser.showDialog(dropArea.getScene().getWindow());
+
+        if (selectedDirectory != null) {
+            selectedFolders = new File[]{selectedDirectory};
+            pdfPathField.setText(selectedDirectory.getAbsolutePath());
+            setStatus("Đã chọn thư mục: " + selectedDirectory.getName(), "black");
+        }
+    }
+
+    @FXML
+    private void convertToExcel() {
+        if (selectedFolders == null || selectedFolders.length == 0) {
+            showError("Hãy chọn thư mục trước!");
+            return;
+        }
+
+        Task<Void> excelTask = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                for (File folder : selectedFolders) {
+                    File txtFile = new File(folder, folder.getName() + ".txt");
+                    if (txtFile.exists()) {
+                        try {
+                            excelService.convertTxtToExcel(txtFile);
+                            Platform.runLater(() ->
+                                    setStatus("Đã chuyển đổi thành công: " + txtFile.getName(), "green"));
+                        } catch (IOException e) {
+                            Platform.runLater(() ->
+                                    setStatus("Lỗi chuyển đổi file: " + txtFile.getName(), "red"));
+                        }
+                    }
+                }
+                return null;
+            }
+        };
+
+        new Thread(excelTask).start();
+    }
+
+    public void shutdown() {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @FXML
+    private void exitApplication() {
+        shutdown(); // Clean up resources
+        Platform.exit();
+    }
+
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Lỗi");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void setStatus(String message, String color) {
+        Platform.runLater(() -> {
+            statusTextArea.setStyle("-fx-text-fill: " + color + ";");
+            statusTextArea.appendText(message + "\n");
+            statusTextArea.setScrollTop(Double.MAX_VALUE); // Auto-scroll to bottom
+        });
+    }
+
+}
+
+
+// Exception
+package com.lazydev.pdf_convert.exception;
+
+public class PDFProcessingException extends RuntimeException {
+
+    public PDFProcessingException(String message) {
+        super(message);
+    }
+
+    public PDFProcessingException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public PDFProcessingException(Throwable cause) {
+        super(cause);
+    }
+}
+
+// Model
+
+package com.lazydev.pdf_convert.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PDFData {
+
+    private String groupName;
+    private String businessName;
+    private String address;
+    private String serialNumber;
+    private String posDevice;
+    private String notes;
+    private String merchantId;
+    private String terminalId;
+    private String terminalId00;
+    private String terminalVtopId;
+    private String posVtop;
+
+    @Override
+    public String toString(){
+        return  "Tên kinh doanh: " + businessName + "\n" +
+                "Địa chỉ: " + address + "\n" +
+                "Số serial: " + serialNumber + "\n" +
+                "Loại máy: " + posDevice + "\n" +
+                "Mã máy: " + groupName + "\n" +
+                "Ghi chú: " + notes + "\n" +
+                "MID: " + merchantId + "\n" +
+                "TID: " + terminalId + "\n" +
+                "TID 00: " + terminalId00 + "\n" +
+                "TID V-TOP: " + terminalVtopId + "\n" +
+                "POS_V-TOP: " + posVtop + "\n";
+    }
+
+
+}
+
+
+// service
+
+package com.lazydev.pdf_convert.service;
+
+import javafx.concurrent.Task;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ConversionService {
+
+    private final ProgressBar progressBar;
+    private final Label progressLable;
+    private final List<File> filesToConvert;
+    private boolean isCancelled;
+
+    public ConversionService(ProgressBar progressBar, Label progressLable){
+        this.progressBar = progressBar;
+        this.progressLable = progressLable;
+        this.filesToConvert = new ArrayList<>();
+        this.isCancelled = false;
+    }
+
+    public void addFiles(List<File> files){
+        filesToConvert.addAll(files);
+        updateProgressLabel("Added "+ files.size() + " files.");
+    }
+
+    public void addFolder(File folder){
+        File[] files = folder.listFiles(((dir, name) -> name.endsWith(".pdf")));
+        if(files != null){
+            addFiles(List.of(files));
+        }
+    }
+
+    public void startConversion() {
+        Task<Void> conversionTask = new Task<>() {
+            @Override
+            protected Void call() {
+                for(int i=0; i <filesToConvert.size(); i++){
+                    if (isCancelled) break;
+                    File file = filesToConvert.get(i);
+                    convertFile(file);
+                    updateProgress(i + 1, filesToConvert.size());
+                }
+                return null;
+            }
+        };
+        progressBar.progressProperty().bind(conversionTask.progressProperty());
+        new Thread(conversionTask).start();
+    }
+
+    public void cancelConversion() {
+        isCancelled = true;
+        updateProgressLabel("Conversion cancelled.");
+    }
+
+    private void convertFile(File file) {
+        // Mock conversion logic
+        try {
+            Thread.sleep(1000); // Simulate time-consuming task
+        } catch (InterruptedException ignored) {
+        }
+    }
+
+    private void updateProgressLabel(String s) {
+    }
+}
+
+
+// ExcelService.java
+package com.lazydev.pdf_convert.service;
+
+import com.lazydev.pdf_convert.model.PDFData;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ExcelService {
+    private static final Logger logger = LoggerFactory.getLogger(ExcelService.class);
+
+    private static final String[] HEADERS = {
+                "Tên File","Tên kinh doanh", "Địa chỉ", "Số serial", "Loại máy",
+                "Mã máy", "Ghi chú", "MID", "TID", "TID 00",
+                "TID V-TOP", "POS V-TOP"
+    };
+
+    public void convertTxtToExcel(File txtFile) throws Exception {
+        if (!txtFile.exists() || !txtFile.getName().endsWith(".txt")) {
+            throw new IllegalArgumentException("Invalid text file");
+        }
+        List<DataEntry> dataList = readDataFromTxt(txtFile);
+        String excelFilePath = txtFile.getParent() + File.separator +
+                txtFile.getName().replace(".txt", ".xlsx");
+        createExcelFile(dataList, excelFilePath);
+    }
+
+    private record DataEntry(PDFData data, String fileName) { }
+
+    private List<DataEntry> readDataFromTxt(File txtFile) throws Exception {
+        List<DataEntry> dataList = new ArrayList<>();
+        PDFData currentData = null;
+        String currentFileName = null;
+
+        try(BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(txtFile), StandardCharsets.UTF_8)
+        )){
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if(line.startsWith("File: ")) {
+                    if(currentData != null ){
+                        dataList.add( new DataEntry(currentData, currentFileName));
+                    }
+                    currentData = new PDFData();
+                    currentFileName = line.substring(6).trim();
+                    continue;
+                }
+                if(currentData != null){
+                    processDataLine(line,currentData);
+                }
+            }
+            if(currentData != null){
+                dataList.add(new DataEntry(currentData,currentFileName));
+            }
+        }
+        return dataList;
+    }
+
+    private void processDataLine(String line, PDFData data) {
+        if (line.startsWith("Tên kinh doanh: ")) {
+            data.setBusinessName(line.substring("Tên kinh doanh: ".length()));
+        } else if (line.startsWith("Địa chỉ: ")) {
+            data.setAddress(line.substring("Địa chỉ: ".length()));
+        } else if (line.startsWith("Số serial: ")) {
+            data.setSerialNumber(line.substring("Số serial: ".length()));
+        } else if (line.startsWith("Loại máy: ")) {
+            data.setPosDevice(line.substring("Loại máy: ".length()));
+        } else if (line.startsWith("Mã máy: ")) {
+            data.setGroupName(line.substring("Mã máy: ".length()));
+        } else if (line.startsWith("Ghi chú: ")) {
+            data.setNotes(line.substring("Ghi chú: ".length()));
+        } else if (line.startsWith("MID: ")) {
+            data.setMerchantId(line.substring("MID: ".length()));
+        } else if (line.startsWith("TID: ")) {
+            data.setTerminalId(line.substring("TID: ".length()));
+        } else if (line.startsWith("TID 00: ")) {
+            data.setTerminalId00(line.substring("TID 00: ".length()));
+        }else if (line.startsWith("TID V-TOP: ")) {
+            data.setTerminalVtopId(line.substring("TID V-TOP: ".length()));
+        } else if (line.startsWith("POS_V-TOP: ")) {
+            data.setPosVtop(line.substring("POS V-TOP: ".length()));
+        }
+    }
+
+    private void createExcelFile(List<DataEntry> dataList, String filePath) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("POS Data");
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            createHeaders(headerRow);
+
+            // Create data rows
+            int rowNum = 1;
+            for (DataEntry entry : dataList) {
+                Row row = sheet.createRow(rowNum++);
+                fillDataRow(row, entry.data(), entry.fileName());
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < HEADERS.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Write to file
+            try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+                workbook.write(outputStream);
+            }
+        }
+    }
+
+    private void createHeaders(Row headerRow) {
+        CellStyle headerStyle = headerRow.getSheet().getWorkbook().createCellStyle();
+        Font headerFont = headerRow.getSheet().getWorkbook().createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+        headerStyle.setAlignment(HorizontalAlignment.CENTER);
+
+        for (int i = 0; i < HEADERS.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(HEADERS[i]);
+            cell.setCellStyle(headerStyle);
+        }
+    }
+
+    private void fillDataRow(Row row, PDFData data, String fileName) {
+        int columnIndex = 0;
+        row.createCell(columnIndex++).setCellValue(fileName);
+        row.createCell(columnIndex++).setCellValue(data.getBusinessName());
+        row.createCell(columnIndex++).setCellValue(data.getAddress());
+        row.createCell(columnIndex++).setCellValue(data.getSerialNumber());
+        row.createCell(columnIndex++).setCellValue(data.getPosDevice());
+        row.createCell(columnIndex++).setCellValue(data.getGroupName());
+        row.createCell(columnIndex++).setCellValue(data.getNotes());
+        row.createCell(columnIndex++).setCellValue(data.getMerchantId());
+        row.createCell(columnIndex++).setCellValue(data.getTerminalId());
+        row.createCell(columnIndex++).setCellValue(data.getTerminalId00());
+        row.createCell(columnIndex++).setCellValue(data.getTerminalVtopId());
+        row.createCell(columnIndex).setCellValue(data.getPosVtop());
+    }
+
+}
+
+package com.lazydev.pdf_convert.service;
+
+import com.lazydev.pdf_convert.exception.PDFProcessingException;
+import com.lazydev.pdf_convert.util.RegexExtractor;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class PDFService {
+    private static final Logger logger = LoggerFactory.getLogger(PDFService.class);
+    private static final String PDF_EXTENSION = ".pdf";
+    private static final String TXT_EXTENSION = ".txt";
+
+    public String convertAllPDFs(File directory) throws PDFProcessingException {
+        validateDirectory(directory);
+
+        File[] pdfFiles = Optional.ofNullable(directory.listFiles((dir, name) -> name.toLowerCase().endsWith(PDF_EXTENSION)))
+                .orElse(new File[0]);
+
+        if (pdfFiles.length == 0) {
+            logger.warn("No PDF files found in directory: {}", directory.getPath());
+            return "Không tìm thấy file PDF nào trong thư mục!";
+        }
+
+        String combinedFileName = directory.getName() + TXT_EXTENSION;
+        File combinedFile = new File(directory, combinedFileName);
+        StringBuilder overallStatus = new StringBuilder("Đang xử lý...\n");
+
+        try (FileWriter writer = new FileWriter(combinedFile, StandardCharsets.UTF_8)) {
+            processFiles(pdfFiles, writer, overallStatus);
+            logger.info("Successfully processed {} files in directory: {}", pdfFiles.length, directory.getPath());
+        } catch (IOException e) {
+            logger.error("Error creating combined file: {}", combinedFile.getPath(), e);
+            throw new PDFProcessingException("Đã xảy ra lỗi khi tạo file tổng hợp: " + e.getMessage());
+        }
+
+        return overallStatus.toString();
+    }
+
+    private void validateDirectory(File directory) {
+        if (directory == null || !directory.exists()) {
+            throw new PDFProcessingException("Thư mục không tồn tại!");
+        }
+        if (!directory.isDirectory()) {
+            throw new PDFProcessingException("Đường dẫn không phải là thư mục!");
+        }
+    }
+
+    private void processFiles(File[] pdfFiles, FileWriter writer, StringBuilder overallStatus) {
+        Arrays.sort(pdfFiles); // Sort files for consistent processing order
+
+        for (File file : pdfFiles) {
+            try (PDDocument document = PDDocument.load(file)) {
+                processIndividualFile(file, document, writer, overallStatus);
+            } catch (IOException e) {
+                logger.error("Error processing file: {}", file.getName(), e);
+                overallStatus.append(file.getName()).append(": Lỗi khi xử lý! Chi tiết: ")
+                        .append(e.getMessage()).append("\n");
+            }
+        }
+    }
+
+    private void processIndividualFile(File file, PDDocument document, FileWriter writer, StringBuilder overallStatus)
+            throws IOException {
+        PDFTextStripper stripper = new PDFTextStripper();
+        String text = stripper.getText(document);
+        String filteredData = RegexExtractor.extractSpecificData(text);
+
+        if (filteredData.isEmpty()) {
+            logger.warn("No data found in file: {}", file.getName());
+            overallStatus.append(file.getName()).append(": không tìm thấy dữ liệu cần thiết!\n");
+            return;
+        }
+
+        writeToFile(writer, file.getName(), filteredData);
+        overallStatus.append(file.getName()).append(": Chuyển đổi thành công!\n");
+        logger.info("Successfully processed file: {}", file.getName());
+    }
+
+    private void writeToFile(FileWriter writer, String fileName, String data) throws IOException{
+        writer.write("File: " + fileName + "\n");
+        writer.write(data);
+        writer.write("\n\n");
+        writer.write("----------------------------------------------------------------\n");
+        writer.flush();
+    }
+}
+
+
+package com.lazydev.pdf_convert.service;
+
+import javafx.application.Platform;
+import javafx.scene.control.Label;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+public class TimerService {
+
+    private final Label timerLabel;
+    private Timer timer;
+    private int claspedSeconds; // Đếm số giây đã trôi qua
+
+    public TimerService(Label timerLabel) {
+        this.timerLabel = timerLabel;
+        this.claspedSeconds = 0;
+    }
+
+    public void timerStart() {
+        timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                claspedSeconds++;
+                updateTimerLabel();
+            }
+        },0,1000); // cứ mỗi 1000ms (1s) run method sẽ được thực thi
+    }
+
+    public void stopTimer() {
+        if(timer != null){
+            timer.cancel();
+        }
+    }
+
+    public void resetTimer() {
+        stopTimer();
+        claspedSeconds = 0;
+        updateTimerLabel();
+    }
+
+    private void updateTimerLabel() {
+        Platform.runLater(() -> timerLabel.setText("Elapsed:"+ claspedSeconds +"s"));
+    }
+
+}
+
+// util
+
+package com.lazydev.pdf_convert.util;
+
+import com.lazydev.pdf_convert.model.PDFData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class RegexExtractor {
+    private static final Logger logger = LoggerFactory.getLogger(RegexExtractor.class);
+
+    // Store patterns as constants for better maintenance
+    private static final Map<String, Pattern> PATTERNS = new HashMap<>();
+
+    static {
+        PATTERNS.put("businessName", Pattern.compile("Tên kinh doanh \\(.*\\):\\s*(.+)"));
+        PATTERNS.put("address", Pattern.compile("Địa chỉ lắp máy:\\s*(.+)"));
+        PATTERNS.put("serialNumber", Pattern.compile("Số S/N của máy EDC:\\s*(\\S+)"));
+        PATTERNS.put("posDevice", Pattern.compile("Loại máy:\\s*(.+)"));
+        PATTERNS.put("groupName", Pattern.compile("Tên pháp lý \\(Theo giấy phép kinh doanh\\):(?:.*-\\s*(\\S+)|\\s*(.+))"));
+        PATTERNS.put("notes", Pattern.compile("Ghi chú:\\s*(.+)"));
+        PATTERNS.put("merchantId", Pattern.compile("MID\\s+VND\\s+([\\d\\s\\n]+)"));
+        PATTERNS.put("terminalId", Pattern.compile("TID\\s+VND\\s+([\\d\\s\\n]+)"));
+        PATTERNS.put("terminalIdVtop", Pattern.compile("TID V-TOP\\s+([\\d\\s\\n]+)"));
+    }
+
+    public static String extractSpecificData(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            logger.warn("Input text is null or empty");
+            return "";
+        }
+
+        PDFData data = new PDFData();
+        try {
+            extractBusinessData(text, data);
+            extractDeviceData(text, data);
+            extractIdentificationData(text, data);
+
+            logger.debug("Successfully extracted data for business: {}", data.getBusinessName());
+            return data.toString();
+        } catch (Exception e) {
+            logger.error("Error extracting data from text", e);
+            return "";
+        }
+    }
+
+    private static void extractBusinessData(String text, PDFData data) {
+        // Business name
+        extractPattern("businessName", text).ifPresent(data::setBusinessName);
+
+        // Address
+        extractPattern("address", text).ifPresent(data::setAddress);
+
+        // Group name
+        Matcher groupMatcher = PATTERNS.get("groupName").matcher(text);
+        if (groupMatcher.find()) {
+            String groupName = groupMatcher.group(1) != null ?
+                    groupMatcher.group(1).trim() :
+                    groupMatcher.group(2).trim();
+            data.setGroupName(groupName);
+        }
+
+        // Notes
+        extractPattern("notes", text).ifPresent(notes -> {
+            if (notes.startsWith("Ngày")) {
+                data.setNotes("null");
+            } else {
+                data.setNotes(notes.trim());
+            }
+        });
+    }
+
+    private static void extractDeviceData(String text, PDFData data) {
+        // Serial number
+        extractPattern("serialNumber", text).ifPresent(serialNumber ->
+                data.setSerialNumber("F" + serialNumber));
+
+        // POS device
+        extractPattern("posDevice", text).ifPresent(device ->
+                data.setPosDevice(device.split("[^a-zA-Z0-9 ]+")[0].trim())
+        );
+    }
+
+    private static void extractIdentificationData(String text, PDFData data) {
+        // Merchant ID
+        extractPattern("merchantId", text)
+                .ifPresent(mid -> data.setMerchantId(mid.replace(" ", "").trim()));
+
+        // Terminal ID and Terminal ID 00
+        extractPattern("terminalId", text).ifPresent(tid -> {
+            String cleanTid = tid.replace(" ", "").trim();
+            data.setTerminalId(cleanTid);
+
+            // Generate Terminal ID 00 if applicable
+            if (cleanTid.length() >= 4 && cleanTid.substring(2, 4).equals("39")) {
+                String tid00 = cleanTid.substring(0, 2) + "00" + cleanTid.substring(4);
+                data.setTerminalId00(tid00);
+            }
+        });
+
+        // Terminal ID V-TOP and POS V-TOP
+        extractPattern("terminalIdVtop", text).ifPresent(tidVtop -> {
+            String cleanTidVtop = tidVtop.replace(" ", "").trim();
+            data.setTerminalVtopId(cleanTidVtop);
+            data.setPosVtop("POS_" + cleanTidVtop);
+        });
+    }
+
+    private static java.util.Optional<String> extractPattern(String patternKey, String text) {
+        Pattern pattern = PATTERNS.get(patternKey);
+        if (pattern == null) {
+            logger.error("Pattern not found for key: {}", patternKey);
+            return java.util.Optional.empty();
+        }
+
+        Matcher matcher = pattern.matcher(text);
+        if (matcher.find()) {
+            return java.util.Optional.of(matcher.group(1).trim());
+        }
+        return java.util.Optional.empty();
+    }
+}
+
+
+
