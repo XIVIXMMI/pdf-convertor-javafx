@@ -1,0 +1,56 @@
+Tầng 8 – Văn phòng số L8-01-11+16, Tòa nhà VinCom Center, 
+72 Lê Thánh Tôn và 45A Lý Tự Trọng, P.Bến Nghé, Q1, TP.HCM
+Tel:(84-8) 3821 0056 – Fax:(84-8) 3829 6063 
+Telex: 812690 EIB.VT Swift: EBVIVNVX - Call Center:39151515     
+Email:contact@eximbank.com.vn – Website:www.eximbank.com.vn
+GIẤY ĐỀ NGHỊ
+KIỂM TRA THÔNG TIN KHÁCH HÀNG ĐỀ NGHỊ HỢP TÁC THANH TOÁN THẺ
+PHẦN ĐỀ NGHỊ CỦA EIB CÁCH M.THÁNG 8 - 2225
+Tên pháp lý (Theo giấy phép kinh doanh): CT TNHH TMDV HAC VANG-ALPHAPAY
+Tên tiếng Anh: 
+Tên kinh doanh (Trên hóa đơn thẻ): CUA HANG HAC VANG
+Số đăng ký kinh doanh: 0317511902
+Sản phẩm, dịch vụ: CUA HANG GAS
+Địa chỉ: 17A HOANG BA HUAN, KP 6, TT CU CHI, CU CHI, TP.HCM
+Điện thoại: 0703524828 Fax: Website: Email: 
+Số CIF: 121727410
+Tài khoản (USD) số: Tại NH: 
+Tài khoản (VND) số: 100235560 Tại NH: 
+Tên chủ doanh nghiệp: DINH NGO BA PHUC Số CMND: 079094026689
+Tên người được ủy quyền: Số CMND: 
+Địa chỉ lắp máy: 17A HOANG BA HUAN, KP 6, TT CU CHI, CU CHI, TP.HCM
+Mặt hàng có giá trị đến (USD)  < 200  200 - 500  500 – 1,000  > 1,000
+Tình trạng hoạt động chấp nhận thanh toán thẻ:
+Lần đầu
+Đã thực hiện tại: (ghi rõ tên chi nhánh nếu là ngân hàng EIB) Tên ngân hàng: 
+Tình trạng:  Đang hoạt động  Đã chấm dứt (Ghi rõ lý do: )
+ĐVCNT do Phòng Giao Dịch quản lý: 2225 EIB Cách M.Tháng 8
+Hóa đơn cà thẻ được gửi về EIB:  3 ngày/1 lần  1 tuần/1 lần  2 tuần/1 lần  Khác (ghi rõ): 
+ Khách hàng do EIB tiếp thị   Khách hàng yêu cầu hợp tác thanh toán thẻ với EIB
+Số S/N của máy EDC: 3D910603 Lắp đặt PIN PAD:  Có  Không
+Loại máy: S90 RF  EPP
+Tình trạng hoạt động chấp nhận thanh toán thẻ: 
+ Tham gia (Globepass, ưu đãi chủ thẻ Eximbank)  Không tham gia. Lý do: 
+Ghi chú: 
+Ngày 29 tháng 10 năm 2024
+Thanh Toán Viên Kiểm Soát Viên Cấp Có Thẩm Quyền
+NGO NGOC QUYNH VY NGUYEN THI MY YEN
+PHẦN KIỂM TRA PHẢN HỒI CỦA PHÒNG VẬN HÀNH THẺ HỘI SỞ
+Kiểm tra Visa-NMAS/MasterCard-MATCH (Danh sách ĐVCNT vi phạm các quy định của Tổ chức thẻ quốc tế (Visa-NMAS/MasterCard-MATCH))
+  Đơn vị chưa bị liệt kê  Đơn vị bị liệt kê
+Ngày: Do Ngân hàng: 
+Lý do: 
+Chương trình chống thu phụ phí của Tổ chức thẻ quốc tế:
+ Đơn vị chưa vi phạm  Đơn vị vi phạm
+Ngày: Ngân hàng: 
+Nhận xét: MCC: 4900
+USD
+MID
+VND 3 9 0 8 5 3 0 0 1 9 0
+USD
+TID
+VND 0 8 3 9 6 3 8 3
+TID V-TOP 8 5 3 0 0 1 9 0
+Ngày 04 tháng 11 năm 2024
+Người Duyệt Cấp Có Thẩm Quyền
+LE QUOC BINH
