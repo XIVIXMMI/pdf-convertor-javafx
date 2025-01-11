@@ -1,0 +1,32 @@
+
+/* progress-bar.css */
+
+/* Định dạng chung cho thanh tiến trình */
+.progress-bar {
+    -fx-min-height: 30px;
+    -fx-max-height: 30px;
+    -fx-min-width: 400px;
+    -fx-background-color: #eeeeee; /* Màu nền mặc định */
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.progress-bar > .track {
+    -fx-background-color: #eeeeee; /* Màu nền cho đường chạy */
+    -fx-background-radius: 4px;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: #2196F3; /* Màu xanh dương mặc định */
+    -fx-background-radius: 4px;
+}
+
+/* Màu xanh hoàn thành */
+.progress-bar.complete > .bar {
+    -fx-background-color: #28a745; /* Xanh lá khi hoàn thành */
+}
+
+/* Hiệu ứng chuyển đổi mượt */
+.progress-bar > .bar {
+    -fx-transition: all 0.3s ease;
+}

@@ -3,7 +3,6 @@ package com.lazydev.pdf_convert.controller;
 
 import com.lazydev.pdf_convert.service.ExcelService;
 import com.lazydev.pdf_convert.service.PDFService;
-import com.lazydev.pdf_convert.service.ConversionService;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -20,8 +19,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
 
 import java.io.File;
-import java.util.List;
-import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -50,6 +48,11 @@ public class PDFConvertController {
     private Timeline timer;
     private final SimpleLongProperty elapsedTimeInSeconds = new SimpleLongProperty(0);
 
+    // Progress Bar
+    private final DoubleProperty totalProgress = new SimpleDoubleProperty(0);
+    //private volatile int totalFiles = 0;
+    //private volatile int processedFiles = 0;
+
     public PDFConvertController() {
         this.executorService = Executors.newFixedThreadPool(
                 Runtime.getRuntime().availableProcessors(),
@@ -77,9 +80,12 @@ public class PDFConvertController {
     // Controller
     @FXML
     public void initialize() {
+
         setupDragAndDrop();
         setupButtons();
-        progressBar.setProgress(0);
+        setupTimer();
+
+        progressBar.progressProperty().bind(totalProgress);
 
         convertButton.disableProperty().bind(converting);
         cancelButton.disableProperty().bind(converting.not());
@@ -90,34 +96,34 @@ public class PDFConvertController {
         cancelButton.setOnAction(event -> cancelOperation());
     }
 
-    private void setupProgressAndTimer() {
-        // Bind progress bar với property
-        progressBar.progressProperty().bind(progress);
+//    private void setupProgressAndTimer() {
+//        // Bind progress bar với property
+//        progressBar.progressProperty().bind(progress);
+//
+//        // Khởi tạo timer
+//        timer = new Timeline(
+//                new KeyFrame(Duration.seconds(1), event -> {
+//                    if (startTime > 0) {
+//                        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+//                        elapsedTimeInSeconds.set(elapsed);
+//                        updateTimerLabel(elapsed);
+//                    }
+//                })
+//        );
+//        timer.setCycleCount(Timeline.INDEFINITE);
+//
+//        // Reset timer label
+//        timerLabel.setText("Thời gian xử lý: 00:00:00");
+//    }
 
-        // Khởi tạo timer
-        timer = new Timeline(
-                new KeyFrame(Duration.seconds(1), event -> {
-                    if (startTime > 0) {
-                        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                        elapsedTimeInSeconds.set(elapsed);
-                        updateTimerLabel(elapsed);
-                    }
-                })
-        );
-        timer.setCycleCount(Timeline.INDEFINITE);
-
-        // Reset timer label
-        timerLabel.setText("Thời gian xử lý: 00:00:00");
-    }
-
-    private void updateTimerLabel(long seconds) {
-        long hours = seconds / 3600;
-        long minutes = (seconds % 3600) / 60;
-        long secs = seconds % 60;
-        Platform.runLater(() ->
-                timerLabel.setText(String.format("Thời gian xử lý: %02d:%02d:%02d",
-                        hours, minutes, secs)));
-    }
+//    private void updateTimerLabel(long seconds) {
+//        long hours = seconds / 3600;
+//        long minutes = (seconds % 3600) / 60;
+//        long secs = seconds % 60;
+//        Platform.runLater(() ->
+//                timerLabel.setText(String.format("Thời gian xử lý: %02d:%02d:%02d",
+//                        hours, minutes, secs)));
+//    }
 
     @FXML
     private void convertData() {
@@ -125,6 +131,12 @@ public class PDFConvertController {
             showError("Hãy chọn thư mục trước!");
             return;
         }
+
+        // Reset progress
+        Platform.runLater(() -> {
+            totalProgress.set(0);
+            progressLabel.setText("0%");
+        });
 
         startConversion(ConversionType.BOTH);
     }
@@ -154,6 +166,9 @@ public class PDFConvertController {
                     AtomicInteger completedTasks = new AtomicInteger();
                     int totalTasks = selectedFolders.length;
                     CountDownLatch latch = new CountDownLatch(totalTasks);
+
+                    // initial progress label
+                    updateProgressLabel(0, totalTasks);
 
                     for (File folder : selectedFolders) {
                         if (isCancelled) {
@@ -186,7 +201,7 @@ public class PDFConvertController {
         timer = new Timeline(
                 new KeyFrame(Duration.seconds(1), event -> {
                     elapsedTimeInSeconds.set((System.currentTimeMillis() - startTime) / 1000);
-                    updateTimerLabel(elapsedTimeInSeconds.get());
+                    //updateTimerLabel(elapsedTimeInSeconds.get());
                 })
         );
         timer.setCycleCount(Timeline.INDEFINITE);
@@ -222,49 +237,67 @@ public class PDFConvertController {
 
         Task<Void> folderTask = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 try {
-                    double folderProgess = 0.0;
-                    // First convert PDF to TXT if needed
+                    // Calculate progress per folder
+                    double progressPerFolder = 1.0 / totalTasks;
+
+                    // PDF conversion phase (50% of folder progress)
                     if (type == ConversionType.PDF_TO_TXT || type == ConversionType.BOTH) {
                         String pdfResult = pdfService.convertAllPDFs(folder);
                         updateTaskStatus(pdfResult, folder.getName());
-                        folderProgess = 0.5;
-                        updateFolderProgress(completedTasks.get(), totalTasks, folderProgess);
-                        //updateProgress(0.6, 1.0);
+
+                        // Update progress for PDF phase
+                        Platform.runLater(() -> {
+                            double currentProgress = totalProgress.get() + (progressPerFolder * 0.5);
+                            totalProgress.set(currentProgress);
+                            progressLabel.setText(String.format("%.1f%%", currentProgress * 100));
+                        });
                     }
 
-                    // Then convert TXT to Excel if needed
+                    // Excel conversion phase (remaining 50% of folder progress)
                     if (type == ConversionType.TXT_TO_EXCEL || type == ConversionType.BOTH) {
                         File txtFile = new File(folder, folder.getName() + ".txt");
                         if (txtFile.exists()) {
                             excelService.convertTxtToExcel(txtFile);
                             updateTaskStatus("Chuyển đổi Excel thành công: " + folder.getName(),
                                     folder.getName());
-                            updateProgress(1.0, 1.0);
+
+                            // Update progress for Excel phase
+                            Platform.runLater(() -> {
+                                double currentProgress = totalProgress.get() + (progressPerFolder * 0.5);
+                                totalProgress.set(currentProgress);
+                                progressLabel.setText(String.format("%.1f%%", currentProgress * 100));
+                            });
                         }
                     }
+
                 } catch (Exception e) {
                     updateTaskStatus("Lỗi xử lý: " + e.getMessage(), folder.getName());
                 } finally {
                     int completed = completedTasks.incrementAndGet();
                     updateProgressLabel(completed, totalTasks);
-                    updateFolderProgress(completed, totalTasks, 1.0);
+
+                    Platform.runLater(() -> {
+                        double finalProgress = (double) completed / totalTasks;
+                        progress.set(finalProgress);
+                        updateProgressDisplay(finalProgress);
+                    });
+
                     latch.countDown();
                 }
                 return null;
             }
         };
 
-        //bindTaskToUI(folderTask, completedTasks, totalTasks);
         executorService.submit(folderTask);
     }
-
-    private void updateFolderProgress(int completedFolders, int totalFolders, double folderProgress) {
-        // Tính toán tổng progress dựa trên số folder đã hoàn thành và progress của folder hiện tại
-        double totalProgress = (completedFolders + folderProgress) / totalFolders;
-        Platform.runLater(() -> progress.set(totalProgress));
-    }
+//
+//    private void updateFolderProgress(int completedFolders, int totalFolders, double folderProgress) {
+//        // Tính toán tổng progress dựa trên số folder đã hoàn thành và progress của folder hiện tại
+//        double totalProgress = (completedFolders + folderProgress) / totalFolders;
+//        Platform.runLater(() -> progress.set(totalProgress));
+//    }
 
     private void updateTaskStatus(String message, String fileName) {
         Platform.runLater(() -> {
@@ -274,19 +307,38 @@ public class PDFConvertController {
     }
 
     // Liên kết Task với giao diện
-    private void bindTaskToUI(Task<?> task, AtomicInteger completedTasks, int totalTasks) {
-        progressBar.progressProperty().bind(task.progressProperty());
-        task.messageProperty().addListener((obs, oldMessage, newMessage) ->
-                Platform.runLater(() -> progressLabel.setText(newMessage)));
-
-        task.progressProperty().addListener((obs, oldProgress, newProgress) -> {
-            Platform.runLater(() -> updateProgressLabel(completedTasks.get(), totalTasks));
-        });
-    }
+//    private void bindTaskToUI(Task<?> task, AtomicInteger completedTasks, int totalTasks) {
+//        progressBar.progressProperty().bind(task.progressProperty());
+//        task.messageProperty().addListener((obs, oldMessage, newMessage) ->
+//                Platform.runLater(() -> progressLabel.setText(newMessage)));
+//
+//        task.progressProperty().addListener((obs, oldProgress, newProgress) -> {
+//            Platform.runLater(() -> updateProgressLabel(completedTasks.get(), totalTasks));
+//        });
+//    }
 
     // Method to update the progress label text
     public void updateProgressLabel(int processed, int total) {
         progressMessage.set(processed + "/" + total + " thư mục đã xử lý");
+    }
+
+//    private void updateProgress(double value) {
+//        Platform.runLater(() -> {
+//            totalProgress.set(value);
+//            int percentage = (int) (value * 100);
+//            progressLabel.setText(percentage + "%");
+//        });
+//    }
+
+    private void updateProgressDisplay(double progress) {
+        int percentage = (int) (progress * 100);
+        progressLabel.setText(percentage + "%");
+
+        // Khi tiến trình hoàn tất, làm nổi bật thanh tiến trình
+        if (progress >= 1.0) {
+            progressBar.getStyleClass().add("complete");
+            setStatus("Quá trình chuyển đổi hoàn tất!", "green");
+        }
     }
 
     private void updateTaskMessage(String message) {
@@ -359,8 +411,9 @@ public class PDFConvertController {
         executorService.shutdownNow();
 
         Platform.runLater(() -> {
-            progress.set(0);
+            totalProgress.set(0);
             progressLabel.setText("Đã hủy tác vụ");
+            progressBar.setStyle(""); // Reset màu thanh tiến trình
             timer.stop();
             elapsedTimeInSeconds.set(0);
             timerLabel.setText("Thời gian xử lý: 00:00:00");
@@ -384,34 +437,34 @@ public class PDFConvertController {
     }
 
     @FXML
-    private void convertToExcel() {
-        if (selectedFolders == null || selectedFolders.length == 0) {
-            showError("Hãy chọn thư mục trước!");
-            return;
-        }
-
-        Task<Void> excelTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                for (File folder : selectedFolders) {
-                    File txtFile = new File(folder, folder.getName() + ".txt");
-                    if (txtFile.exists()) {
-                        try {
-                            excelService.convertTxtToExcel(txtFile);
-                            Platform.runLater(() ->
-                                    setStatus("Đã chuyển đổi thành công: " + txtFile.getName(), "green"));
-                        } catch (IOException e) {
-                            Platform.runLater(() ->
-                                    setStatus("Lỗi chuyển đổi file: " + txtFile.getName(), "red"));
-                        }
-                    }
-                }
-                return null;
-            }
-        };
-
-        new Thread(excelTask).start();
-    }
+//    private void convertToExcel() {
+//        if (selectedFolders == null || selectedFolders.length == 0) {
+//            showError("Hãy chọn thư mục trước!");
+//            return;
+//        }
+//
+//        Task<Void> excelTask = new Task<>() {
+//            @Override
+//            protected Void call() throws Exception {
+//                for (File folder : selectedFolders) {
+//                    File txtFile = new File(folder, folder.getName() + ".txt");
+//                    if (txtFile.exists()) {
+//                        try {
+//                            excelService.convertTxtToExcel(txtFile);
+//                            Platform.runLater(() ->
+//                                    setStatus("Đã chuyển đổi thành công: " + txtFile.getName(), "green"));
+//                        } catch (IOException e) {
+//                            Platform.runLater(() ->
+//                                    setStatus("Lỗi chuyển đổi file: " + txtFile.getName(), "red"));
+//                        }
+//                    }
+//                }
+//                return null;
+//            }
+//        };
+//
+//        new Thread(excelTask).start();
+//    }
 
     public void shutdown() {
         executorService.shutdown();
