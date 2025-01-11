@@ -3,12 +3,12 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.Text?>
 
 <?import javafx.scene.image.ImageView?>
+
 <VBox alignment="TOP_CENTER" spacing="15.0" xmlns:fx="http://javafx.com/fxml/1"
         fx:controller="com.lazydev.pdf_convert.controller.PDFConvertController"
-        stylesheets="@styles.css">
+        stylesheets="@styles.css, @process-bar.css">
 
     <padding>
         <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
@@ -53,18 +53,24 @@
         </VBox>
     </VBox>
 
-<!--     Progress Section -->
+    <!-- Progress Section -->
     <VBox spacing="5.0" styleClass="section-container">
         <Label text="Tiến độ xử lý:" styleClass="section-header"/>
+
+        <StackPane>
+            <ProgressBar fx:id="progressBar"
+                         prefWidth="400"
+                         prefHeight="100"
+                         progress="0.0"
+                         styleClass="progress-bar"/>
+            <Label fx:id="progressLabel"
+                    styleClass="progress-text"
+                    text="0%"/>
+        </StackPane>
+
         <Label fx:id="timerLabel" text="Thời gian xử lý: 00:00:00"/>
-        <ProgressBar fx:id="progressBar"
-                        prefWidth="400"
-                        progress="0.0"
-                        styleClass="progress-bar"/>
-        <Label fx:id="progressLabel"
-                text="0/0 files processed"
-                styleClass="progress-text"/>
     </VBox>
+
 
     <!-- Status Area -->
     <VBox spacing="5.0" styleClass="section-container">
