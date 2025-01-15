@@ -1,32 +1,80 @@
-
 /* progress-bar.css */
 
-/* Định dạng chung cho thanh tiến trình */
+/* Container cho progress bar */
+.progress-section {
+    -fx-background-color: #c0c0c0;
+    -fx-padding: 20px;
+    -fx-border-color: #808080;
+    -fx-border-width: 2px;
+    -fx-border-style: solid;
+}
+
+/* Heading style */
+.progress-heading {
+    -fx-font-family: "Courier New";
+    -fx-font-size: 16px;
+    -fx-text-fill: #000080;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 10px 0;
+}
+
+/* Progress bar container */
 .progress-bar {
-    -fx-min-height: 30px;
-    -fx-max-height: 30px;
+    -fx-min-height: 25px;
+    -fx-max-height: 25px;
     -fx-min-width: 400px;
-    -fx-background-color: #eeeeee; /* Màu nền mặc định */
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
+    -fx-background-color: transparent;
+    -fx-border-color: #808080;
+    -fx-border-width: 2px;
+    -fx-border-style: solid;
+    -fx-padding: 2px;
 }
 
+/* Track của progress bar */
 .progress-bar > .track {
-    -fx-background-color: #eeeeee; /* Màu nền cho đường chạy */
-    -fx-background-radius: 4px;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
 }
 
+/* Thanh progress */
 .progress-bar > .bar {
-    -fx-background-color: #2196F3; /* Màu xanh dương mặc định */
-    -fx-background-radius: 4px;
+    -fx-background-color: #000080;
+    -fx-background-radius: 0;
+    -fx-background-insets: 0;
+    -fx-border-radius: 0;
+    -fx-padding: 0;
 }
 
-/* Màu xanh hoàn thành */
-.progress-bar.complete > .bar {
-    -fx-background-color: #28a745; /* Xanh lá khi hoàn thành */
+/* Label hiển thị phần trăm */
+.progress-text {
+    -fx-font-family: "Courier New";
+    -fx-font-size: 14px;
+    -fx-text-fill: #000000;
+    -fx-font-weight: bold;
 }
 
-/* Hiệu ứng chuyển đổi mượt */
-.progress-bar > .bar {
-    -fx-transition: all 0.3s ease;
+/* Status text area */
+.status-area {
+    -fx-font-family: "Courier New";
+    -fx-font-size: 14px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #808080;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+}
+
+/* Nút Cancel */
+.danger-button {
+    -fx-font-family: "Courier New";
+    -fx-font-size: 14px;
+    -fx-background-color: #c0c0c0;
+    -fx-border-color: #808080;
+    -fx-border-width: 2px;
+    -fx-text-fill: #000000;
+    -fx-padding: 5px 15px;
+}
+
+.danger-button:hover {
+    -fx-background-color: #d3d3d3;
 }
